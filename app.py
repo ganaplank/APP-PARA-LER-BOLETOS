@@ -52,10 +52,9 @@ with st.sidebar:
     st.header("📂 Arquivos")
     uploaded_excel = st.file_uploader("1. Carregar Excel de Condomínios", type=['xlsx'])
     uploaded_logo = st.file_uploader("2. Carregar Logótipo (Opcional)", type=['png', 'jpg', 'jpeg'])
-    # --- NOVO UPLOAD PARA ASSINATURA ---
     uploaded_assinatura = st.file_uploader("3. Carregar Assinatura (Opcional)", type=['png', 'jpg', 'jpeg'])
     
-    st.info("O sistema usará os arquivos carregados aqui para gerar o PDF.")
+    st.info("O sistema usará os arquivos carregados aqui. Se não carregar nada, buscará os arquivos automáticos do GitHub.")
 
 # --- CARREGAMENTO DE DADOS ---
 BASE_DE_DADOS = {}
@@ -88,7 +87,7 @@ if uploaded_logo:
         f.write(uploaded_logo.getbuffer())
     logo_path_final = "temp_logo.png"
 
-# --- TRATAMENTO DA ASSINATURA (NOVO) ---
+# Tratamento da Assinatura
 assinatura_path_final = None
 if uploaded_assinatura:
     with open("temp_assinatura.png", "wb") as f:
@@ -148,34 +147,40 @@ if BASE_DE_DADOS:
             )
             pdf.multi_cell(0, 7, txt=texto_corpo, align='J')
             
-            # Data e Assinatura
+            # Data
             data_hoje = datetime.now().strftime("%d/%m/%Y")
             pdf.ln(5)
             pdf.cell(0, 10, txt=f"São Paulo/SP, {data_hoje}.", ln=True, align='R')
             
-            # --- ÁREA DA ASSINATURA MODIFICADA ---
-            pdf.ln(10) # Espaço antes da assinatura
+            # --- ÁREA DA ASSINATURA ---
+            # Dá um espaço antes de inserir a imagem
+            pdf.ln(10)
 
             if assinatura_path_final:
-                # Insere a imagem da assinatura centralizada
-                # x=85 é uma posição aproximada para centralizar numa folha A4
-                # w=40 é a largura da assinatura (ajuste se ficar muito grande/pequena)
+                # Pega a posição vertical atual
                 current_y = pdf.get_y()
-                pdf.image(assinatura_path_final, x=85, y=current_y, w=40)
-                pdf.ln(15) # Move o cursor para baixo da imagem da assinatura
+                
+                # Configuração:
+                # x=75 -> Centralizado para o tamanho novo (antes era 85)
+                # w=60 -> Largura maior (antes era 40)
+                pdf.image(assinatura_path_final, x=75, y=current_y, w=60)
+                
+                # Empurra o cursor para baixo da imagem para não riscar em cima
+                pdf.ln(20) 
             else:
-                 pdf.ln(25) # Espaço em branco se não tiver imagem
+                 # Se não tiver assinatura, deixa um espaço em branco grande
+                 pdf.ln(25)
 
-            # Desenha a linha
+            # Desenha a linha de assinatura
             pdf.cell(0, 5, txt="_" * 50, ln=True, align='C')
             
-            # REMOVIDO: O texto com o nome da empresa que ficava aqui embaixo
-            # ------------------------------------
-
-            # Salva e Baixar
+            # Texto abaixo da linha removido conforme pedido anteriormente
+            
+            # Salva e prepara Download
             id_condo = escolha.split('-')[0].strip()
             nome_arquivo = f"Recibo_{id_condo}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             pdf_content = pdf.output(dest='S').encode('latin-1')
+            
             st.success("✅ PDF Gerado com Sucesso!")
             st.download_button(
                 label="📥 Baixar PDF Agora",
