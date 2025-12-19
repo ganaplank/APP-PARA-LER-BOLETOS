@@ -50,10 +50,12 @@ st.markdown("Sistema automatizado para geração de PDFs.")
 # Barra lateral para uploads e configurações
 with st.sidebar:
     st.header("📂 Arquivos")
-    uploaded_excel = st.file_uploader("Carregar Excel de Condomínios", type=['xlsx'])
-    uploaded_logo = st.file_uploader("Carregar Logótipo (Opcional)", type=['png', 'jpg', 'jpeg'])
+    uploaded_excel = st.file_uploader("1. Carregar Excel de Condomínios", type=['xlsx'])
+    uploaded_logo = st.file_uploader("2. Carregar Logótipo (Opcional)", type=['png', 'jpg', 'jpeg'])
+    # --- NOVO UPLOAD PARA ASSINATURA ---
+    uploaded_assinatura = st.file_uploader("3. Carregar Assinatura (Opcional)", type=['png', 'jpg', 'jpeg'])
     
-    st.info("Se não carregar arquivos, o sistema tentará usar os arquivos locais 'Condominios_Unicos.xlsx' e 'LOGO.png'.")
+    st.info("O sistema usará os arquivos carregados aqui para gerar o PDF.")
 
 # --- CARREGAMENTO DE DADOS ---
 BASE_DE_DADOS = {}
@@ -82,19 +84,24 @@ else:
 # Tratamento do Logo
 logo_path_final = "LOGO.png" if os.path.exists("LOGO.png") else None
 if uploaded_logo:
-    # Salva o logo temporariamente para o FPDF usar
     with open("temp_logo.png", "wb") as f:
         f.write(uploaded_logo.getbuffer())
     logo_path_final = "temp_logo.png"
 
+# --- TRATAMENTO DA ASSINATURA (NOVO) ---
+assinatura_path_final = None
+if uploaded_assinatura:
+    with open("temp_assinatura.png", "wb") as f:
+        f.write(uploaded_assinatura.getbuffer())
+    assinatura_path_final = "temp_assinatura.png"
+elif os.path.exists("ASSINATURA.png"):
+     assinatura_path_final = "ASSINATURA.png"
+
 # --- FORMULÁRIO ---
 if BASE_DE_DADOS:
     col1, col2 = st.columns(2)
-    
     with col1:
-        # Selectbox com pesquisa
         escolha = st.selectbox("Selecione o Condomínio:", options=list(BASE_DE_DADOS.keys()))
-    
     with col2:
         valor_input = st.number_input("Valor (R$):", min_value=0.0, step=100.0, format="%.2f")
 
@@ -140,25 +147,36 @@ if BASE_DE_DADOS:
                 f"repassando os valores da atividade nesta data, dando a mais ampla geral e irrestrita quitação quanto aos valores que compõe a presente."
             )
             pdf.multi_cell(0, 7, txt=texto_corpo, align='J')
-            pdf.ln(15)
-
+            
+            # Data e Assinatura
             data_hoje = datetime.now().strftime("%d/%m/%Y")
+            pdf.ln(5)
             pdf.cell(0, 10, txt=f"São Paulo/SP, {data_hoje}.", ln=True, align='R')
             
-            pdf.ln(15)
-            pdf.cell(0, 5, txt="_" * 50, ln=True, align='C')
-            pdf.cell(0, 5, txt="CAIO.C.S.MOREIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA", ln=True, align='C')
+            # --- ÁREA DA ASSINATURA MODIFICADA ---
+            pdf.ln(10) # Espaço antes da assinatura
 
-            # Salva num arquivo temporário para permitir o download
+            if assinatura_path_final:
+                # Insere a imagem da assinatura centralizada
+                # x=85 é uma posição aproximada para centralizar numa folha A4
+                # w=40 é a largura da assinatura (ajuste se ficar muito grande/pequena)
+                current_y = pdf.get_y()
+                pdf.image(assinatura_path_final, x=85, y=current_y, w=40)
+                pdf.ln(15) # Move o cursor para baixo da imagem da assinatura
+            else:
+                 pdf.ln(25) # Espaço em branco se não tiver imagem
+
+            # Desenha a linha
+            pdf.cell(0, 5, txt="_" * 50, ln=True, align='C')
+            
+            # REMOVIDO: O texto com o nome da empresa que ficava aqui embaixo
+            # ------------------------------------
+
+            # Salva e Baixar
             id_condo = escolha.split('-')[0].strip()
             nome_arquivo = f"Recibo_{id_condo}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            
-            # Gera o binário do PDF
             pdf_content = pdf.output(dest='S').encode('latin-1')
-            
             st.success("✅ PDF Gerado com Sucesso!")
-            
-            # Botão de Download
             st.download_button(
                 label="📥 Baixar PDF Agora",
                 data=pdf_content,
